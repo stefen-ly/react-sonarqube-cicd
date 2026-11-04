@@ -22,10 +22,10 @@ function CustomNavBar({ isAuthenticated, loginCallBack }) {
     const ClientLinks = () => (
         <>
             <NavLink className={"nav-link"} to="/">
-                ទំព័រដើម
+                ទំព័រដើមទី១
             </NavLink>
             <NavLink className={"nav-link"} to="/service">
-                សេវាកម្ម
+                សេវាកម្មយើងខ្ញុំ
             </NavLink>
             <NavLink className={"nav-link"} to="/products">
                 ផលិតផល
