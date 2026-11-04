@@ -1,318 +1,132 @@
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faArrowRight,
-  faSeedling,
-  faDroplet,
-  faLeaf,
-  faChartLine,
-  faSun,
-  faCheckCircle,
-  faLightbulb,
-} from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faPaperPlane } from "@fortawesome/free-solid-svg-icons";
 
 import "../styles/homepageStyle.css";
 
-const features = [
-  {
-    icon: faSeedling,
-    title: "ការដាំដុះឆ្លាតវៃ",
-    description:
-      "ស្វែងយល់ពីបច្ចេកទេសដាំដុះទំនើប ដើម្បីឱ្យដំណាំលូតលាស់បានល្អ និងមានគុណភាពខ្ពស់។",
-  },
-  {
-    icon: faDroplet,
-    title: "ការគ្រប់គ្រងទឹក",
-    description:
-      "ប្រើប្រាស់ធនធានទឹកឱ្យមានប្រសិទ្ធភាព ដោយអនុវត្តវិធីសាស្ត្រស្រោចស្រពសមស្រប។",
-  },
-  {
-    icon: faChartLine,
-    title: "បង្កើនទិន្នផល",
-    description:
-      "រៀបចំផែនការកសិកម្ម កាត់បន្ថយការខ្ជះខ្ជាយ និងបង្កើនប្រសិទ្ធភាពផលិតកម្ម។",
-  },
-];
-
-const benefits = [
-  "លើកកម្ពស់គុណភាពដី និងសុខភាពដំណាំ",
-  "កាត់បន្ថយការប្រើប្រាស់ធនធានខ្ជះខ្ជាយ",
-  "ជួយរៀបចំផែនការដាំដុះប្រកបដោយប្រសិទ្ធភាព",
-  "គាំទ្រការអភិវឌ្ឍកសិកម្មប្រកបដោយចីរភាព",
-];
-
 const HomePage = () => {
-  return (
-    <main className="earthdx-home">
 
-      {/* Hero Section */}
-      <section className="earthdx-hero">
+    return (
         <div className="container">
-          <div className="row align-items-center g-5">
+            <div className="d-flex header-section flex-column flex-md-row  mt-4 ">
+                <div className="container pt-4   order-2 order-md-1">
+                    <h1 className="display-2 header-title">
+                        {" "}
+                        សូមស្វាគមន៍មកកាន់ EarthDX (កំណែថ្មីឆ្នាំ ២០២៦)
+                    </h1>
+                    <p> យើងជាក្រុមការងារដែលពោរពេញដោយឆន្ទៈ និងការប្តេជ្ញាចិត្ត ក្នុងគោលបំណងលើកកម្ពស់គុណភាពជីវិតរបស់អ្នកគ្រប់គ្នា តាមរយៈការបង្កើតផលិតផលបច្ចេកវិទ្យាថ្មីៗប្រកបដោយភាពច្នៃប្រឌិត។ យើងបង្កើតផលិតផលដ៏ឆ្នើម ដើម្បីជួយដោះស្រាយបញ្ហាអាជីវកម្មរបស់អ្នក។</p>
+                    <div className="d-flex pt-5">
+                        <button className="btn btn-success px-4 py-2">
+                            {" "}
+                            <strong> ចូលរួមឥឡូវនេះ </strong>{" "}
+                        </button>
+                        <button className="ps-4 nav-link">
+                            <span>
+                                <strong className="pre-scrollable">
+                                    ស្វែងយល់បន្ថែម {"  "}
+                                </strong>
+                            </span>
+                            <FontAwesomeIcon icon={faArrowRight} />
+                        </button>
+                    </div>
+                </div>
 
-            <div className="col-lg-6">
-              <div className="earthdx-hero-content">
+                <div className="order-md-2">
+                    <img
+                        className="img-fluid "
+                        src="https://d2gg9evh47fn9z.cloudfront.net/800px_COLOURBOX1940798.jpg"
+                        alt="រូបភាពតំណាង"
+                    />
+                </div>
+            </div>
 
-                <span className="earthdx-label">
-                  <FontAwesomeIcon icon={faLeaf} />
-                  បច្ចេកវិទ្យាកសិកម្មសម្រាប់អនាគត
-                </span>
-
-                <h1 className="earthdx-hero-title">
-                  សូមស្វាគមន៍មកកាន់
-                  <span> EarthDX</span>
-                  <br />
-                  អនាគតនៃ
-                  <span> កសិកម្មឆ្លាតវៃ</span>
+            <div className="container text-center mt-5 pt-5 mb-5">
+                <h1 className="feature-title">
+                    {" "}
+                    ជំហានដើម្បីចាប់ផ្តើម
+                    <span className="feature-title text-success pre-scrollable">
+                        ផែនការរបស់អ្នកឱ្យបានត្រឹមត្រូវ
+                    </span>
                 </h1>
-
-                <p className="earthdx-hero-description">
-                  យើងជឿជាក់ថា បច្ចេកវិទ្យាអាចជួយផ្លាស់ប្តូរ
-                  វិស័យកសិកម្មឱ្យកាន់តែប្រសើរ។
-                  EarthDX ផ្តោតលើការចែករំលែកចំណេះដឹង
-                  និងដំណោះស្រាយទំនើប ដើម្បីជួយកសិករ
-                  បង្កើនផលិតភាព និងអភិវឌ្ឍកសិកម្ម
-                  ប្រកបដោយចីរភាព។
-                </p>
-
-                <div className="earthdx-hero-actions">
-                  <a href="#features" className="earthdx-btn-primary">
-                    ស្វែងយល់ពីសេវាកម្ម
-                    <FontAwesomeIcon icon={faArrowRight} />
-                  </a>
-
-                  <a href="#about" className="earthdx-btn-outline">
-                    អំពីពួកយើង
-                  </a>
+                <div className="d-flex flex-column container flex-wrap flex-md-row justify-content-center gap-5 mt-5 ">
+                    <div className="item-card px-4 pb-3  col-sm-12 col-md-4 col-lg-3">
+                        <img
+                            className="img-fluid p-4"
+                            src="https://cdn3d.iconscout.com/3d/premium/thumb/plant-5293900-4432198.png"
+                            alt="រូបភាពរុក្ខជាតិ"
+                        />
+                        <h2> ការការពារដំណាំ</h2>
+                        <p> ការការពារ មានន័យថាការទប់ស្កាត់ហានិភ័យ ជំងឺ ឬការខូចខាតដែលអាចកើតមានឡើង។ ក្នុងវិស័យកសិកម្ម ការការពារដំណាំជួយកាត់បន្ថយការបាត់បង់ទិន្នផល និងរក្សាគុណភាពដំណាំឱ្យបានល្អ។</p>
+                    </div>
+                    <div className="item-card px-4 pb-3 col-sm-12 col-md-4 col-lg-3">
+                        <img
+                            className="img-fluid"
+                            src="https://cdn3d.iconscout.com/3d/premium/thumb/plant-6347424-5242126.png"
+                            alt="រូបភាពរុក្ខជាតិ"
+                        />
+                        <h2> ការគ្រប់គ្រងហានិភ័យ</h2>
+                        <p> ការគ្រប់គ្រងហានិភ័យ គឺជាការរៀបចំផែនការ និងអនុវត្តវិធានការដើម្បីកាត់បន្ថយការខូចខាត។ វាជួយឱ្យកសិករអាចការពារដំណាំពីជំងឺ សត្វល្អិត និងបញ្ហាបរិស្ថានផ្សេងៗ។</p>
+                    </div>
+                    <div className="item-card px-4 pb-3 col-sm-12 col-md-4 col-lg-3">
+                        <img
+                            className="img-fluid "
+                            src="https://cdn3d.iconscout.com/3d/premium/thumb/plant-pot-5663958-4719914.png"
+                            alt="រូបភាពផើងរុក្ខជាតិ"
+                        />
+                        <h2> ការអភិវឌ្ឍប្រកបដោយចីរភាព</h2>
+                        <p> ការអភិវឌ្ឍប្រកបដោយចីរភាព គឺជាការប្រើប្រាស់ធនធានធម្មជាតិឱ្យមានប្រសិទ្ធភាព ដើម្បីរក្សាបរិស្ថាន និងលើកកម្ពស់ផលិតភាពកសិកម្មសម្រាប់បច្ចុប្បន្ន និងអនាគត។</p>
+                    </div>
                 </div>
-
-                <div className="earthdx-hero-highlights">
-                  <span>
-                    <FontAwesomeIcon icon={faCheckCircle} />
-                    បច្ចេកវិទ្យាទំនើប
-                  </span>
-                  <span>
-                    <FontAwesomeIcon icon={faCheckCircle} />
-                    កសិកម្មប្រកបដោយចីរភាព
-                  </span>
-                </div>
-              </div>
             </div>
 
-            <div className="col-lg-6">
-              <div className="earthdx-hero-image-wrapper">
-                <img
-                  src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=85"
-                  alt="ទេសភាពវាលស្រែ និងកសិដ្ឋានបៃតង"
-                  className="earthdx-hero-image"
-                />
-
-                <div className="earthdx-floating-card">
-                  <span className="earthdx-floating-icon">
-                    <FontAwesomeIcon icon={faSeedling} />
-                  </span>
-                  <div>
-                    <strong>Smart Farming</strong>
-                    <p>រួមគ្នាអភិវឌ្ឍកសិកម្ម</p>
-                  </div>
+            <div
+                className="container section3 d-flex flex-column
+      flex-md-row mt-5 pt-5 justify-content-center align-items-center"
+            >
+                <div className="image-side col-sm-12 col-md-6 col-lg-5 ">
+                    <img
+                        className="img-fluid"
+                        src="https://i.pinimg.com/736x/dd/60/b0/dd60b0ed3169b8aa469da1ee784bc088.jpg"
+                        alt="រូបភាពផ្កា"
+                    />
                 </div>
-              </div>
+
+                <div className="text-side ">
+                    <h1 className="feature-title">ផ្តល់សារធាតុចិញ្ចឹមល្អៗដល់សួនដំណាំរបស់អ្នក</h1>
+                    <ul>
+                        <li>ការលូតលាស់ និងសុខភាពដំណាំកាន់តែប្រសើរ៖ នៅពេលអ្នកផ្តល់សារធាតុចិញ្ចឹមគ្រប់គ្រាន់ដល់ដំណាំ ដំណាំនឹងលូតលាស់រឹងមាំ មានសុខភាពល្អ និងផ្តល់ទិន្នផលខ្ពស់។ វាក៏ជួយបង្កើនភាពធន់នឹងជំងឺ និងធ្វើឱ្យផលិតផលមានពណ៌ និងរសជាតិកាន់តែល្អ។</li>
+                        <li>សារធាតុចិញ្ចឹមល្អអាចជួយកែលម្អរចនាសម្ព័ន្ធដី ធ្វើឱ្យដីអាចរក្សាទឹក និងបង្ហូរទឹកបានសមស្រប។ វាជួយឱ្យរុក្ខជាតិលូតលាស់បានល្អ និងកាត់បន្ថយបញ្ហាសំណឹកដី។</li>
+                        <li>ការបង្កើនជីជាតិដី៖ ការផ្តល់សារធាតុចិញ្ចឹមសមស្របអាចជួយបង្កើនជីជាតិដី ដែលនាំឱ្យទទួលបានទិន្នផលកាន់តែច្រើន និងដំណាំមានសុខភាពល្អ។</li>
+                    </ul>
+                </div>
             </div>
 
-          </div>
+            <div
+                className="section4 mx-0 mx-lg-5 d-flex flex-column flex-md-row  justify-content-center
+      align-items-center
+      container"
+            >
+                <div className="text-side w-100 w-md-75  order-2 order-md-0">
+                    <h1 className="feature-title">រួមគ្នាដាំដុះ និងអភិវឌ្ឍរុក្ខជាតិរបស់អ្នក</h1>
+                    <p className="w-100 w-lg-50 pe-0 pe-md-5">
+                        យើងជាក្រុមការងារដែលមានចំណង់ចំណូលចិត្ត និងការប្តេជ្ញាចិត្តខ្ពស់ ក្នុងគោលបំណងលើកកម្ពស់គុណភាពជីវិតរបស់មនុស្សគ្រប់រូប តាមរយៈការបង្កើតផលិតផល និងដំណោះស្រាយបច្ចេកវិទ្យាថ្មីៗ។ យើងផ្តល់នូវដំណោះស្រាយប្រកបដោយភាពច្នៃប្រឌិត ដើម្បីជួយដោះស្រាយបញ្ហាអាជីវកម្ម និងការអភិវឌ្ឍរបស់អ្នក។
+                    </p>
+
+                    <button className="btn btn-success px-5 py-2 mt-4">
+                        ស្វែងយល់បន្ថែម <FontAwesomeIcon icon={faArrowRight} />
+                    </button>
+                </div>
+
+                <div className="image-side">
+                    <img
+                        className="img-fluid rounded-3"
+                        src="https://img.freepik.com/free-photo/faux-watermelon-peperomia-plant-gray-pot_53876-110373.jpg?w=740&t=st=1689090817~exp=1689091417~hmac=3d894a048f16d3d703d59d3caaf24623a9cc6652c05615fe159743eca8b1cfd6"
+                        alt="រូបភាពរុក្ខជាតិក្នុងផើង"
+                    />
+                </div>
+            </div>
         </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="earthdx-section">
-        <div className="container">
-
-          <div className="earthdx-section-heading">
-            <span className="earthdx-section-label">
-              ដំណោះស្រាយរបស់យើង
-            </span>
-
-            <h2>
-              ចាប់ផ្តើមកសិកម្មឆ្លាតវៃ
-              <span> ជាមួយ EarthDX</span>
-            </h2>
-
-            <p>
-              ស្វែងយល់ពីដំណោះស្រាយដែលជួយឱ្យ
-              ការដាំដុះមានប្រសិទ្ធភាព និងសមស្រប
-              ទៅនឹងតម្រូវការកសិកម្មសម័យថ្មី។
-            </p>
-          </div>
-
-          <div className="row g-4">
-            {features.map((feature, index) => (
-              <div className="col-md-6 col-lg-4" key={index}>
-                <article className="earthdx-feature-card">
-
-                  <div className="earthdx-feature-icon">
-                    <FontAwesomeIcon icon={feature.icon} />
-                  </div>
-
-                  <h3>{feature.title}</h3>
-
-                  <p>{feature.description}</p>
-
-                  <a href="#about" className="earthdx-feature-link">
-                    ស្វែងយល់បន្ថែម
-                    <FontAwesomeIcon icon={faArrowRight} />
-                  </a>
-
-                </article>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section id="about" className="earthdx-about">
-        <div className="container">
-          <div className="row align-items-center g-5">
-
-            <div className="col-lg-6">
-              <div className="earthdx-about-image">
-                <img
-                  src="https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=1000&q=85"
-                  alt="ការដាំដុះរុក្ខជាតិបៃតង"
-                  loading="lazy"
-                />
-                <div className="earthdx-image-tag">
-                  <FontAwesomeIcon icon={faLeaf} />
-                  កសិកម្មបៃតង
-                </div>
-              </div>
-            </div>
-
-            <div className="col-lg-6">
-              <span className="earthdx-section-label">
-                អំពី EarthDX
-              </span>
-
-              <h2 className="earthdx-about-title">
-                រួមគ្នាបង្កើត
-                <span> អនាគតបៃតង</span>
-                សម្រាប់គ្រប់គ្នា
-              </h2>
-
-              <p className="earthdx-about-description">
-                EarthDX ជាគម្រោងដែលមានគោលបំណង
-                លើកកម្ពស់ការយល់ដឹងអំពីកសិកម្មទំនើប
-                និងការប្រើប្រាស់បច្ចេកវិទ្យាក្នុង
-                ការគ្រប់គ្រងកសិដ្ឋាន។
-              </p>
-
-              <p className="earthdx-about-description">
-                យើងផ្តោតលើការអភិវឌ្ឍប្រកបដោយចីរភាព
-                ការអភិរក្សធនធានធម្មជាតិ និង
-                ការបង្កើនប្រសិទ្ធភាពផលិតកម្មកសិកម្ម។
-              </p>
-
-              <div className="earthdx-benefit-list">
-                {benefits.map((benefit, index) => (
-                  <div className="earthdx-benefit-item" key={index}>
-                    <FontAwesomeIcon icon={faCheckCircle} />
-                    <span>{benefit}</span>
-                  </div>
-                ))}
-              </div>
-
-              <a href="#vision" className="earthdx-btn-primary">
-                ស្វែងយល់ពីចក្ខុវិស័យ
-                <FontAwesomeIcon icon={faArrowRight} />
-              </a>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* Vision Section */}
-      <section id="vision" className="earthdx-vision">
-        <div className="container">
-          <div className="row align-items-center g-5">
-
-            <div className="col-lg-6">
-
-              <span className="earthdx-section-label">
-                ចក្ខុវិស័យរបស់យើង
-              </span>
-
-              <h2 className="earthdx-vision-title">
-                បច្ចេកវិទ្យា
-                <span> និងធម្មជាតិ</span>
-                ដើរទៅមុខជាមួយគ្នា
-              </h2>
-
-              <p>
-                យើងចង់ឃើញវិស័យកសិកម្មកម្ពុជា
-                រីកចម្រើនតាមរយៈការប្រើប្រាស់
-                បច្ចេកវិទ្យា ចំណេះដឹង និងការច្នៃប្រឌិត។
-                កសិកម្មដែលមានប្រសិទ្ធភាព
-                គឺជាមូលដ្ឋានសម្រាប់អនាគតប្រកបដោយចីរភាព។
-              </p>
-
-              <div className="earthdx-vision-points">
-                <div>
-                  <FontAwesomeIcon icon={faSun} />
-                  <span>ការអភិវឌ្ឍប្រកបដោយចីរភាព</span>
-                </div>
-
-                <div>
-                  <FontAwesomeIcon icon={faLightbulb} />
-                  <span>ការច្នៃប្រឌិត និងចំណេះដឹងថ្មីៗ</span>
-                </div>
-              </div>
-
-              <a href="#features" className="earthdx-btn-primary">
-                ចាប់ផ្តើមស្វែងយល់
-                <FontAwesomeIcon icon={faArrowRight} />
-              </a>
-
-            </div>
-
-            <div className="col-lg-6">
-              <div className="earthdx-vision-image">
-                <img
-                  src="https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?auto=format&fit=crop&w=1000&q=85"
-                  alt="សួនច្បារ និងដំណាំបៃតង"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* Call to Action */}
-      <section className="earthdx-cta">
-        <div className="container">
-          <div className="earthdx-cta-box">
-            <FontAwesomeIcon icon={faSeedling} />
-
-            <h2>តោះ! រួមគ្នាបង្កើតអនាគតកសិកម្ម</h2>
-
-            <p>
-              ចាប់ផ្តើមស្វែងយល់ពីបច្ចេកវិទ្យាថ្មីៗ
-              និងដំណោះស្រាយសម្រាប់កសិកម្មឆ្លាតវៃជាមួយយើង។
-            </p>
-
-            <a href="#features" className="earthdx-btn-light">
-              ស្វែងយល់ឥឡូវនេះ
-              <FontAwesomeIcon icon={faArrowRight} />
-            </a>
-          </div>
-        </div>
-      </section>
-
-    </main>
-  );
+    );
 };
 
 export default HomePage;
