@@ -10,9 +10,9 @@ const HomePage = () => {
                 <div className="container pt-4   order-2 order-md-1">
                     <h1 className="display-2 header-title">
                         {" "}
-                      Welcome to EarthDX (2026 Latest )
+                      សូមស្វាគមន៍មកកាន់ EarthDX (ចុងក្រោយបង្អស់ឆ្នាំ ២០២៦) 
                     </h1>
-                    <p> We are a team of passionate people whose goal is to improve everyone's life through disruptive products. We build great products to solve your business problems.</p>
+                    <p> យើងជាក្រុមការងារដែលពោរពេញដោយឆន្ទៈ និងការប្តេជ្ញាចិត្ត ក្នុងគោលបំណងលើកកម្ពស់គុណភាពជីវិតរបស់អ្នកគ្រប់គ្នា តាមរយៈការបង្កើតផលិតផលបច្ចេកវិទ្យាថ្មីៗប្រកបដោយភាពច្នៃប្រឌិត។ យើងបង្កើតផលិតផលដ៏ឆ្នើម ដើម្បីជួយដោះស្រាយបញ្ហាអាជីវកម្មរបស់អ្នក។</p>
                     <div className="d-flex pt-5">
                         <button className="btn btn-success px-4 py-2">
                             {" "}
