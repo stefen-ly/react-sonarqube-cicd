@@ -1,3 +1,4 @@
+
 import { useContext, useState } from 'react';
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
@@ -21,29 +22,29 @@ function CustomNavBar({ isAuthenticated, loginCallBack }) {
     const ClientLinks = () => (
         <>
             <NavLink className={"nav-link"} to="/">
-                Home
+                ទំព័រដើម
             </NavLink>
             <NavLink className={"nav-link"} to="/service">
-                Service
+                សេវាកម្ម
             </NavLink>
             <NavLink className={"nav-link"} to="/products">
-                Products
+                ផលិតផល
             </NavLink>
             <NavLink className={"nav-link"} to="/aboutus">
-                AboutUs
+                អំពីពួកយើង
             </NavLink>
         </>
     )
     const AdminLinks = () => (
         <>
             <NavLink className={"nav-link"} to="/">
-                Dashboard
+                ផ្ទាំងគ្រប់គ្រង
             </NavLink>
             <NavLink className={"nav-link"} to="/admin/products">
-                Product Dashboard
+                គ្រប់គ្រងផលិតផល
             </NavLink>
             <NavLink className={"nav-link"} to="/admin/users">
-                User Dashboard
+                គ្រប់គ្រងអ្នកប្រើប្រាស់
             </NavLink>
 
         </>
@@ -95,18 +96,18 @@ function CustomNavBar({ isAuthenticated, loginCallBack }) {
                                         <button
                                             className='btn btn-warning'
                                             onClick={handleLogout}
-                                        > Logout </button>
+                                        > ចាកចេញពីគណនី </button>
                                     </>
                                     :
                                     <>
                                         <button
                                             className='btn btn-warning me-3'
-                                            onClick={handleSignUp}> Sign Up
+                                            onClick={handleSignUp}> ចុះឈ្មោះ
                                         </button>
                                         <button
                                             className='btn btn-success'
                                             onClick={handleLogin}>
-                                            Login
+                                            ចូលគណនី
                                         </button>
                                     </>
                             }
