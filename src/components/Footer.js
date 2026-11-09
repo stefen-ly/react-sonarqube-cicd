@@ -74,7 +74,7 @@ const Footer = () => {
 
       <div className="allrights text-center">
         <p>
-          © 2023 All Rights Reserved. Design by{" "}
+          © 2026 All Rights Reserved. Design by{" "}
           <span
             style={{ fontWeight: "bolder" }}
             className="text-light text-weight-bold"
