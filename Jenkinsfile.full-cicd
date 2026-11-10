@@ -2,6 +2,11 @@
 pipeline {
     agent none
 
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timestamps()
+    }
 
     environment {
         IMAGE = 'stefenly19/react-multi-agent'
@@ -11,25 +16,27 @@ pipeline {
         AWS_USER = 'ubuntu'
     }
 
-
     stages {
-        stage('Checkout & SonarQube Scan') {
+
+        stage('01 - Checkout & SonarQube Scan') {
             agent { label 'build' }
 
             stages {
-                stage('Checkout') {
+                stage('Checkout GitHub') {
                     steps {
                         checkout scm
+                        sh 'git log -1 --oneline'
                     }
                 }
 
-                stage('SonarQube Scan') {
+                stage('SonarQube Analysis') {
                     steps {
                         withSonarQubeEnv('SonarQube-Agent-Lab') {
                             sh '''
                                 sonar-scanner \
                                   -Dsonar.projectKey=jenkins-multi-agent-lab \
                                   -Dsonar.sources=src \
+                                  -Dsonar.exclusions="**/node_modules/**,**/build/**" \
                                   -Dsonar.host.url="$SONAR_HOST_URL" \
                                   -Dsonar.token="$SONAR_AUTH_TOKEN"
                             '''
@@ -39,14 +46,20 @@ pipeline {
             }
         }
 
-        stage('Wait for Quality Gate') {
+        stage('02 - Wait for Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
                     script {
+                        echo 'Waiting for SonarQube...'
+
                         def qg = waitForQualityGate()
 
+                        echo "Quality Gate: ${qg.status}"
+
                         if (qg.status != 'OK') {
-                            error "Quality Gate FAILED: ${qg.status}"
+                            error(
+                                "BUILD BLOCKED! Quality Gate: ${qg.status}"
+                            )
                         }
 
                         echo 'Quality Gate PASSED!'
@@ -55,91 +68,211 @@ pipeline {
             }
         }
 
-        stage('Build & Push Docker Image') {
+        stage('03 - Build React') {
             agent { label 'build' }
 
             steps {
                 checkout scm
 
                 sh '''
+                    set -eu
+
+                    echo "Running on: $(hostname)"
+
+                    node -v
+                    npm -v
+
                     npm ci
                     npm run build
+
                     test -d build
+
+                    echo "REACT BUILD SUCCESS"
                 '''
+            }
+        }
+
+        stage('04 - Docker Buildx and Push') {
+            agent { label 'build' }
+
+            steps {
+                checkout scm
 
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
+                        credentialsId: 'dockerhub-multi-agent',
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
                     sh '''
                         set -eu
+                        set +x
+
+                        export DOCKER_CONFIG
+                        DOCKER_CONFIG="$(mktemp -d)"
+
+                        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 
                         printf '%s' "$DOCKER_PASS" |
                           docker login \
                             -u "$DOCKER_USER" \
                             --password-stdin
 
+                        if ! docker buildx inspect \
+                          multi-agent-builder >/dev/null 2>&1; then
+
+                            docker buildx create \
+                              --name multi-agent-builder \
+                              --driver docker-container
+                        fi
+
+                        docker buildx inspect \
+                          multi-agent-builder --bootstrap
+
                         docker buildx build \
-                          --platform linux/arm64 \
+                          --builder multi-agent-builder \
+                          --platform linux/amd64,linux/arm64 \
                           -t "$IMAGE:$TAG" \
                           --push .
+
+                        echo "DOCKER IMAGE PUSH SUCCESS"
+                        echo "Image: $IMAGE:$TAG"
                     '''
                 }
             }
         }
 
-        stage('Deploy Local Staging') {
+        stage('05 - Deploy Local Staging') {
             agent { label 'deploy' }
 
             steps {
                 sh '''
+                    set -eu
+
+                    docker info >/dev/null
+
                     docker pull "$IMAGE:$TAG"
 
-                    docker rm -f react-staging || true
+                    docker rm -f react-multi-agent-staging \
+                      2>/dev/null || true
 
                     docker run -d \
-                      --name react-staging \
-                      -p 3006:80 \
+                      --name react-multi-agent-staging \
+                      --restart unless-stopped \
+                      -p 127.0.0.1:3006:80 \
                       "$IMAGE:$TAG"
+
+                    echo "STAGING DEPLOYED"
                 '''
             }
         }
 
-        stage('Staging Health Check') {
+        stage('06 - Staging Health Check') {
             agent { label 'deploy' }
 
             steps {
                 sh '''
-                    curl -fsS http://localhost:3006/
+                    set -eu
+
+                    for i in $(seq 1 15); do
+
+                        if curl -fsS \
+                          http://127.0.0.1:3006/ \
+                          -o /dev/null; then
+
+                            echo "STAGING HEALTHY"
+                            exit 0
+                        fi
+
+                        sleep 2
+                    done
+
+                    echo "STAGING HEALTH CHECK FAILED"
+                    exit 1
                 '''
             }
         }
 
-        stage('Production Approval') {
+        stage('07 - Production Approval') {
             steps {
-                input message: 'Deploy to AWS Production?',
-                      ok: 'Deploy'
+                timeout(time: 15, unit: 'MINUTES') {
+                    input(
+                        message: "Deploy ${env.IMAGE}:${env.TAG} to AWS EC2 ${env.AWS_HOST}?",
+                        ok: 'Approve Deployment'
+                    )
+                }
             }
         }
 
-        stage('Deploy AWS Production') {
+        stage('08 - Deploy AWS Production') {
             agent { label 'deploy' }
 
             steps {
-                sshagent(['aws-production-ssh']) {
+                sshagent(credentials: ['aws-production-ssh']) {
                     sh '''
-                        ssh "$AWS_USER@$AWS_HOST" \
-                          "docker pull $IMAGE:$TAG && \
-                           docker rm -f react-prod-demo || true"
+                        set -eu
 
-                        ssh "$AWS_USER@$AWS_HOST" \
-                          "docker run -d \
-                           --name react-prod-demo \
-                           -p 3007:80 \
-                           $IMAGE:$TAG"
+                        ssh \
+                          -o BatchMode=yes \
+                          -o StrictHostKeyChecking=yes \
+                          "$AWS_USER@$AWS_HOST" \
+                          "IMAGE='$IMAGE:$TAG' bash -se" <<'REMOTE'
+                        set -eu
+
+                        echo "AWS architecture: $(uname -m)"
+
+                        docker info >/dev/null
+
+                        docker pull "$IMAGE"
+
+                        docker rm -f react-prod-demo \
+                          2>/dev/null || true
+
+                        docker run -d \
+                          --name react-prod-demo \
+                          --restart unless-stopped \
+                          -p 127.0.0.1:3007:80 \
+                          "$IMAGE"
+
+                        echo "AWS DEPLOYMENT SUCCESS"
+REMOTE
+                    '''
+                }
+            }
+        }
+
+        stage('09 - Production Health Check') {
+            agent { label 'deploy' }
+
+            steps {
+                sshagent(credentials: ['aws-production-ssh']) {
+                    sh '''
+                        set -eu
+
+                        ssh \
+                          -o BatchMode=yes \
+                          -o StrictHostKeyChecking=yes \
+                          "$AWS_USER@$AWS_HOST" \
+                          'bash -se' <<'REMOTE'
+                        set -eu
+
+                        for i in $(seq 1 15); do
+
+                            if curl -fsS \
+                              http://127.0.0.1:3007/ \
+                              -o /dev/null; then
+
+                                echo "PRODUCTION HEALTHY"
+                                exit 0
+                            fi
+
+                            sleep 2
+                        done
+
+                        echo "PRODUCTION HEALTH CHECK FAILED"
+                        exit 1
+REMOTE
                     '''
                 }
             }
@@ -152,7 +285,11 @@ pipeline {
         }
 
         failure {
-            echo 'PIPELINE FAILED'
+            echo 'PIPELINE FAILED - CHECK CONSOLE OUTPUT'
+        }
+
+        aborted {
+            echo 'PIPELINE ABORTED'
         }
     }
 }
