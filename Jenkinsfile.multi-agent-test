@@ -1,58 +1,75 @@
 
 pipeline {
-    agent { label 'build' }
+    agent none
 
     options {
         skipDefaultCheckout(true)
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Verify Build Agent') {
-            steps {
-                sh '''
-                    hostname
-                    whoami
-                    node -v
-                    npm -v
-                '''
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm ci'
-            }
-        }
-
         stage('Build React') {
-            steps {
-                sh 'npm run build'
+            agent { label 'build' }
+
+            stages {
+                stage('Checkout') {
+                    steps {
+                        checkout scm
+                    }
+                }
+
+                stage('Install Dependencies') {
+                    steps {
+                        sh 'npm ci'
+                    }
+                }
+
+                stage('Build') {
+                    steps {
+                        sh 'npm run build'
+                    }
+                }
+
+                stage('Verify Output') {
+                    steps {
+                        sh 'test -d build'
+                    }
+                }
+
+                stage('SonarQube Analysis') {
+                    steps {
+                        withSonarQubeEnv(
+                            installationName: 'SonarQube-Agent-Lab'
+                        ) {
+                            sh '''
+                                sonar-scanner \
+                                  -Dsonar.projectKey=jenkins-multi-agent-lab \
+                                  -Dsonar.sources=src \
+                                  -Dsonar.exclusions="**/node_modules/**,**/build/**" \
+                                  -Dsonar.host.url="$SONAR_HOST_URL" \
+                                  -Dsonar.token="$SONAR_AUTH_TOKEN"
+                            '''
+                        }
+                    }
+                }
             }
         }
 
-        stage('Verify Output') {
+        stage('Quality Gate') {
             steps {
-                sh '''
-                    test -d dist || test -d build
-                    echo "React build verified"
-                '''
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'MULTI-AGENT REACT BUILD SUCCESS'
+            echo 'REACT BUILD + SONARQUBE QUALITY GATE PASSED'
         }
 
         failure {
-            echo 'MULTI-AGENT REACT BUILD FAILED'
+            echo 'REACT MULTI-AGENT CI FAILED'
         }
     }
 }
