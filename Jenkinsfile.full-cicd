@@ -135,7 +135,7 @@ pipeline {
                         --platform linux/amd64,linux/arm64 \
                         -f Dockerfile.multi-agent \
                         -t "$IMAGE:$TAG" \
-                        --push . .
+                        --push .
 
                         echo "DOCKER IMAGE PUSH SUCCESS"
                         echo "Image: $IMAGE:$TAG"
