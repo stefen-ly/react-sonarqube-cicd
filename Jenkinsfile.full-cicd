@@ -2,12 +2,15 @@
 pipeline {
     agent none
 
+
     environment {
-        IMAGE = 'YOUR_DOCKERHUB_USERNAME/react-multi-agent'
+        IMAGE = 'stefenly19/react-multi-agent'
         TAG = "${BUILD_NUMBER}"
-        AWS_HOST = 'YOUR_AWS_PUBLIC_IP'
+
+        AWS_HOST = '52.221.253.109'
         AWS_USER = 'ubuntu'
     }
+
 
     stages {
         stage('Checkout & SonarQube Scan') {
