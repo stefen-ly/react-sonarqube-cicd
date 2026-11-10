@@ -13,14 +13,13 @@ pipeline {
             }
         }
 
-        stage('Verify Environment') {
+        stage('Verify Build Agent') {
             steps {
                 sh '''
                     hostname
                     whoami
                     node -v
                     npm -v
-                    git --version
                 '''
             }
         }
@@ -37,17 +36,11 @@ pipeline {
             }
         }
 
-        stage('Verify Build Output') {
+        stage('Verify Output') {
             steps {
                 sh '''
-                    if [ -d dist ]; then
-                        echo "Vite build succeeded"
-                    elif [ -d build ]; then
-                        echo "React build succeeded"
-                    else
-                        echo "No expected build directory found"
-                        exit 1
-                    fi
+                    test -d dist || test -d build
+                    echo "React build verified"
                 '''
             }
         }
@@ -55,12 +48,11 @@ pipeline {
 
     post {
         success {
-            echo 'REACT MULTI-AGENT CI TEST SUCCESS'
+            echo 'MULTI-AGENT REACT BUILD SUCCESS'
         }
 
         failure {
-            echo 'REACT MULTI-AGENT CI TEST FAILED'
+            echo 'MULTI-AGENT REACT BUILD FAILED'
         }
     }
 }
-
