@@ -31,6 +31,50 @@ function App() {
   }
   return (
 
+
+    
+function App() {
+
+  // SONARQUBE DEMO: Intentional code quality issues
+
+  // Issue 1: Identical branches
+  function calculateDiscount(price) {
+    if (price > 100) {
+      return price * 0.9;
+    } else {
+      return price * 0.9;
+    }
+  }
+
+  // Issue 2: Identical conditions
+  function getUserRole(role) {
+    if (role === "admin") {
+      return "Administrator";
+    } else if (role === "admin") {
+      return "Administrator";
+    }
+
+    return "User";
+  }
+
+  // Issue 3: Redundant boolean expression
+  function isEligible(age) {
+    if (age >= 18) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  // Your original React state continues here
+  const [isValidated, setIsValidated] = useState(
+    localStorage.getItem("tokens") ? true : false
+  );
+
+  // Keep the rest of your original App.js unchanged
+}
+
+
     // !isLoading && 
 
     <BigRouter>
