@@ -131,10 +131,11 @@ pipeline {
                           multi-agent-builder --bootstrap
 
                         docker buildx build \
-                          --builder multi-agent-builder \
-                          --platform linux/amd64,linux/arm64 \
-                          -t "$IMAGE:$TAG" \
-                          --push .
+                        --builder multi-agent-builder \
+                        --platform linux/amd64,linux/arm64 \
+                        -f Dockerfile.multi-agent \
+                        -t "$IMAGE:$TAG" \
+                        --push . .
 
                         echo "DOCKER IMAGE PUSH SUCCESS"
                         echo "Image: $IMAGE:$TAG"
