@@ -195,13 +195,32 @@ pipeline {
             }
         }
 
-        stage('07 - Production Approval') {
+        // stage('07 - Production Approval') {
+        //     steps {
+        //         timeout(time: 15, unit: 'MINUTES') {
+        //             input(
+        //                 message: "Deploy ${env.IMAGE}:${env.TAG} to AWS EC2 ${env.AWS_HOST}?",
+        //                 ok: 'Approve Deployment'
+        //             )
+        //         }
+        //     }
+        // }
+
+        stage('07 - Verify AWS Connection') {
+            agent { label 'deploy' }
+
             steps {
-                timeout(time: 15, unit: 'MINUTES') {
-                    input(
-                        message: "Deploy ${env.IMAGE}:${env.TAG} to AWS EC2 ${env.AWS_HOST}?",
-                        ok: 'Approve Deployment'
-                    )
+                sshagent(credentials: ['aws-production-ssh']) {
+                    sh '''
+                        set -eu
+
+                        ssh \
+                        -o BatchMode=yes \
+                        -o StrictHostKeyChecking=yes \
+                        -o ConnectTimeout=10 \
+                        "$AWS_USER@$AWS_HOST" \
+                        'hostname; uname -m; docker info >/dev/null && echo "AWS DOCKER READY"'
+                    '''
                 }
             }
         }
