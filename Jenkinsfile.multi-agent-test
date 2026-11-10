@@ -1,0 +1,66 @@
+
+pipeline {
+    agent { label 'build' }
+
+    options {
+        skipDefaultCheckout(true)
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Verify Environment') {
+            steps {
+                sh '''
+                    hostname
+                    whoami
+                    node -v
+                    npm -v
+                    git --version
+                '''
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm ci'
+            }
+        }
+
+        stage('Build React') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+
+        stage('Verify Build Output') {
+            steps {
+                sh '''
+                    if [ -d dist ]; then
+                        echo "Vite build succeeded"
+                    elif [ -d build ]; then
+                        echo "React build succeeded"
+                    else
+                        echo "No expected build directory found"
+                        exit 1
+                    fi
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'REACT MULTI-AGENT CI TEST SUCCESS'
+        }
+
+        failure {
+            echo 'REACT MULTI-AGENT CI TEST FAILED'
+        }
+    }
+}
+
