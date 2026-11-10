@@ -7,7 +7,7 @@ pipeline {
     }
 
     stages {
-        stage('Build React') {
+        stage('React CI + SonarQube') {
             agent { label 'build' }
 
             stages {
@@ -17,19 +17,30 @@ pipeline {
                     }
                 }
 
+                stage('Verify Build Agent') {
+                    steps {
+                        sh '''
+                            hostname
+                            node -v
+                            npm -v
+                            sonar-scanner --version
+                        '''
+                    }
+                }
+
                 stage('Install Dependencies') {
                     steps {
                         sh 'npm ci'
                     }
                 }
 
-                stage('Build') {
+                stage('Build React') {
                     steps {
                         sh 'npm run build'
                     }
                 }
 
-                stage('Verify Output') {
+                stage('Verify Build') {
                     steps {
                         sh 'test -d build'
                     }
@@ -37,9 +48,7 @@ pipeline {
 
                 stage('SonarQube Analysis') {
                     steps {
-                        withSonarQubeEnv(
-                            installationName: 'SonarQube-Agent-Lab'
-                        ) {
+                        withSonarQubeEnv('SonarQube-Agent-Lab') {
                             sh '''
                                 sonar-scanner \
                                   -Dsonar.projectKey=jenkins-multi-agent-lab \
