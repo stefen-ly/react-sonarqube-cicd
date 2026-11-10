@@ -1,0 +1,155 @@
+
+pipeline {
+    agent none
+
+    environment {
+        IMAGE = 'YOUR_DOCKERHUB_USERNAME/react-multi-agent'
+        TAG = "${BUILD_NUMBER}"
+        AWS_HOST = 'YOUR_AWS_PUBLIC_IP'
+        AWS_USER = 'ubuntu'
+    }
+
+    stages {
+        stage('Checkout & SonarQube Scan') {
+            agent { label 'build' }
+
+            stages {
+                stage('Checkout') {
+                    steps {
+                        checkout scm
+                    }
+                }
+
+                stage('SonarQube Scan') {
+                    steps {
+                        withSonarQubeEnv('SonarQube-Agent-Lab') {
+                            sh '''
+                                sonar-scanner \
+                                  -Dsonar.projectKey=jenkins-multi-agent-lab \
+                                  -Dsonar.sources=src \
+                                  -Dsonar.host.url="$SONAR_HOST_URL" \
+                                  -Dsonar.token="$SONAR_AUTH_TOKEN"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Wait for Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    script {
+                        def qg = waitForQualityGate()
+
+                        if (qg.status != 'OK') {
+                            error "Quality Gate FAILED: ${qg.status}"
+                        }
+
+                        echo 'Quality Gate PASSED!'
+                    }
+                }
+            }
+        }
+
+        stage('Build & Push Docker Image') {
+            agent { label 'build' }
+
+            steps {
+                checkout scm
+
+                sh '''
+                    npm ci
+                    npm run build
+                    test -d build
+                '''
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+
+                        printf '%s' "$DOCKER_PASS" |
+                          docker login \
+                            -u "$DOCKER_USER" \
+                            --password-stdin
+
+                        docker buildx build \
+                          --platform linux/arm64 \
+                          -t "$IMAGE:$TAG" \
+                          --push .
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Local Staging') {
+            agent { label 'deploy' }
+
+            steps {
+                sh '''
+                    docker pull "$IMAGE:$TAG"
+
+                    docker rm -f react-staging || true
+
+                    docker run -d \
+                      --name react-staging \
+                      -p 3006:80 \
+                      "$IMAGE:$TAG"
+                '''
+            }
+        }
+
+        stage('Staging Health Check') {
+            agent { label 'deploy' }
+
+            steps {
+                sh '''
+                    curl -fsS http://localhost:3006/
+                '''
+            }
+        }
+
+        stage('Production Approval') {
+            steps {
+                input message: 'Deploy to AWS Production?',
+                      ok: 'Deploy'
+            }
+        }
+
+        stage('Deploy AWS Production') {
+            agent { label 'deploy' }
+
+            steps {
+                sshagent(['aws-production-ssh']) {
+                    sh '''
+                        ssh "$AWS_USER@$AWS_HOST" \
+                          "docker pull $IMAGE:$TAG && \
+                           docker rm -f react-prod-demo || true"
+
+                        ssh "$AWS_USER@$AWS_HOST" \
+                          "docker run -d \
+                           --name react-prod-demo \
+                           -p 3007:80 \
+                           $IMAGE:$TAG"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'FULL CI/CD PIPELINE SUCCESS'
+        }
+
+        failure {
+            echo 'PIPELINE FAILED'
+        }
+    }
+}
