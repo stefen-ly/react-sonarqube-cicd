@@ -5,3 +5,13 @@ coverage
 .scannerwork
 .env
 npm-debug.log*
+
+# Local security scan output
+npm-audit-report.json
+trivy-reports/
+.trivy-cache/
+
+# Local security scan output
+npm-audit-report.json
+trivy-reports/
+.trivy-cache/

@@ -30,3 +30,7 @@ coverage
 .scannerwork
 .env
 npm-debug.log*
+# Security reports and local Trivy cache
+npm-audit-report.json
+trivy-reports/
+.trivy-cache/
