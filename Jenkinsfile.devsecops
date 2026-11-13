@@ -44,8 +44,10 @@ pipeline {
             }
         }
 
+
         stage('3. OWASP Dependency Check') {
             agent { label 'build' }
+
             steps {
                 dependencyCheck(
                     odcInstallation: 'OWASP-Dependency-Check',
@@ -60,12 +62,14 @@ pipeline {
                     stopBuild: true
                 )
             }
+
             post {
                 always {
                     dependencyCheckPublisher(
                         pattern: 'dependency-check-report/dependency-check-report.xml',
                         skipNoReportFiles: true
                     )
+
                     archiveArtifacts(
                         artifacts: 'dependency-check-report/*',
                         allowEmptyArchive: true
@@ -73,6 +77,7 @@ pipeline {
                 }
             }
         }
+
 
         stage('4. SonarQube Scan') {
             agent { label 'build' }
