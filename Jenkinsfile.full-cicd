@@ -154,6 +154,7 @@ pipeline {
             }
         }
 
+
         stage('6. Deploy Staging') {
             agent { label 'deploy' }
 
@@ -161,22 +162,42 @@ pipeline {
                 sh '''
                     set -eu
 
+                    echo "Pulling Docker image..."
                     docker pull "$IMAGE:$TAG"
 
+                    echo "Replacing staging container..."
                     docker rm -f react-multi-agent-staging || true
 
                     docker run -d \
-                      --name react-multi-agent-staging \
-                      -p 127.0.0.1:3006:80 \
-                      "$IMAGE:$TAG"
+                    --name react-multi-agent-staging \
+                    --restart unless-stopped \
+                    -p 127.0.0.1:3006:80 \
+                    "$IMAGE:$TAG"
 
-                    curl --retry 10 --retry-delay 2 \
-                      --retry-connrefused -fsS \
-                      http://127.0.0.1:3006/ \
-                      -o /dev/null
+                    echo "Checking staging health..."
+
+                    if ! curl \
+                    --retry 15 \
+                    --retry-delay 2 \
+                    --retry-all-errors \
+                    --connect-timeout 5 \
+                    --max-time 10 \
+                    -fsS \
+                    http://127.0.0.1:3006/ \
+                    -o /dev/null; then
+
+                        echo "Staging health check failed"
+                        docker ps -a \
+                        --filter name=react-multi-agent-staging
+                        docker logs --tail 100 react-multi-agent-staging
+                        exit 1
+                    fi
+
+                    echo "STAGING DEPLOYMENT SUCCESS"
                 '''
             }
         }
+
 
         stage('7. Production Approval & Deploy') {
             when {
