@@ -2,97 +2,90 @@
 pipeline {
     agent none
 
-    options {
-        skipDefaultCheckout(true)
-        disableConcurrentBuilds()
-        timestamps()
-    }
-
     environment {
         IMAGE = 'stefenly19/react-multi-agent'
         TAG = "${BUILD_NUMBER}"
-
         AWS_HOST = '52.221.253.109'
         AWS_USER = 'ubuntu'
     }
 
     stages {
 
-        stage('01 - Checkout & SonarQube Scan') {
+        stage('1. SonarQube') {
             agent { label 'build' }
 
-            stages {
-                stage('Checkout GitHub') {
-                    steps {
-                        checkout scm
-                        sh 'git log -1 --oneline'
-                    }
-                }
+            steps {
+                checkout scm
 
-                stage('SonarQube Analysis') {
-                    steps {
-                        withSonarQubeEnv('SonarQube-Agent-Lab') {
-                            sh '''
-                                sonar-scanner \
-                                  -Dsonar.projectKey=jenkins-multi-agent-lab \
-                                  -Dsonar.sources=src \
-                                  -Dsonar.exclusions="**/node_modules/**,**/build/**" \
-                                  -Dsonar.host.url="$SONAR_HOST_URL" \
-                                  -Dsonar.token="$SONAR_AUTH_TOKEN"
-                            '''
-                        }
-                    }
+                withSonarQubeEnv('SonarQube-Agent-Lab') {
+                    sh '''
+                        sonar-scanner \
+                          -Dsonar.projectKey=jenkins-multi-agent-lab \
+                          -Dsonar.sources=src \
+                          -Dsonar.host.url="$SONAR_HOST_URL" \
+                          -Dsonar.token="$SONAR_AUTH_TOKEN"
+                    '''
                 }
             }
         }
 
-        stage('02 - Wait for Quality Gate') {
+        stage('2. Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
-                    script {
-                        echo 'Waiting for SonarQube...'
-
-                        def qg = waitForQualityGate()
-
-                        echo "Quality Gate: ${qg.status}"
-
-                        if (qg.status != 'OK') {
-                            error(
-                                "BUILD BLOCKED! Quality Gate: ${qg.status}"
-                            )
-                        }
-
-                        echo 'Quality Gate PASSED!'
-                    }
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        stage('03 - Build React') {
+        stage('3. Trivy Security Scan') {
             agent { label 'build' }
 
             steps {
                 checkout scm
 
                 sh '''
-                    set -eu
+                    mkdir -p trivy-reports
 
-                    echo "Running on: $(hostname)"
+                    docker run --rm \
+                      --user "$(id -u):$(id -g)" \
+                      -v "$PWD:/app" \
+                      -w /app \
+                      aquasec/trivy:0.76.2 fs \
+                      --scanners vuln,secret \
+                      --severity HIGH,CRITICAL \
+                      --skip-dirs node_modules \
+                      --exit-code 1 \
+                      --format json \
+                      --output trivy-reports/report.json \
+                      .
+                '''
+            }
 
-                    node -v
-                    npm -v
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts: 'trivy-reports/report.json',
+                        allowEmptyArchive: true
+                    )
+                }
+            }
+        }
 
+        stage('4. Build React') {
+            agent { label 'build' }
+
+            steps {
+                checkout scm
+
+                sh '''
+                    set -e
                     npm ci
                     npm run build
-
-                    test -d build
-
-                    echo "REACT BUILD SUCCESS"
                 '''
             }
         }
 
-        stage('04 - Docker Buildx and Push') {
+        stage('5. Docker Build & Push') {
             agent { label 'build' }
 
             steps {
@@ -101,197 +94,85 @@ pipeline {
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub-multi-agent',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
+                        usernameVariable: 'USER',
+                        passwordVariable: 'PASS'
                     )
                 ]) {
                     sh '''
-                        set -eu
+                        set -e
                         set +x
 
-                        export DOCKER_CONFIG
-                        DOCKER_CONFIG="$(mktemp -d)"
-
+                        export DOCKER_CONFIG="$(mktemp -d)"
                         trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 
-                        printf '%s' "$DOCKER_PASS" |
-                          docker login \
-                            -u "$DOCKER_USER" \
-                            --password-stdin
-
-                        if ! docker buildx inspect \
-                          multi-agent-builder >/dev/null 2>&1; then
-
-                            docker buildx create \
-                              --name multi-agent-builder \
-                              --driver docker-container
-                        fi
-
-                        docker buildx inspect \
-                          multi-agent-builder --bootstrap
+                        echo "$PASS" | docker login \
+                          -u "$USER" --password-stdin
 
                         docker buildx build \
-                        --builder multi-agent-builder \
-                        --platform linux/amd64,linux/arm64 \
-                        -f Dockerfile.multi-agent \
-                        -t "$IMAGE:$TAG" \
-                        --push .
-
-                        echo "DOCKER IMAGE PUSH SUCCESS"
-                        echo "Image: $IMAGE:$TAG"
+                          --builder multi-agent-builder \
+                          --platform linux/amd64,linux/arm64 \
+                          -f Dockerfile.multi-agent \
+                          -t "$IMAGE:$TAG" \
+                          --push .
                     '''
                 }
             }
         }
 
-        stage('05 - Deploy Local Staging') {
+        stage('6. Deploy Staging') {
             agent { label 'deploy' }
 
             steps {
                 sh '''
-                    set -eu
-
-                    docker info >/dev/null
+                    set -e
 
                     docker pull "$IMAGE:$TAG"
-
-                    docker rm -f react-multi-agent-staging \
-                      2>/dev/null || true
+                    docker rm -f react-multi-agent-staging || true
 
                     docker run -d \
                       --name react-multi-agent-staging \
-                      --restart unless-stopped \
                       -p 127.0.0.1:3006:80 \
                       "$IMAGE:$TAG"
 
-                    echo "STAGING DEPLOYED"
+                    curl --retry 10 --retry-delay 2 \
+                      --retry-connrefused -fsS \
+                      http://127.0.0.1:3006/ \
+                      -o /dev/null
                 '''
             }
         }
 
-        stage('06 - Staging Health Check') {
+        stage('7. Production Approval & Deploy') {
             agent { label 'deploy' }
 
             steps {
-                sh '''
-                    set -eu
-
-                    for i in $(seq 1 15); do
-
-                        if curl -fsS \
-                          http://127.0.0.1:3006/ \
-                          -o /dev/null; then
-
-                            echo "STAGING HEALTHY"
-                            exit 0
-                        fi
-
-                        sleep 2
-                    done
-
-                    echo "STAGING HEALTH CHECK FAILED"
-                    exit 1
-                '''
-            }
-        }
-
-        // stage('07 - Production Approval') {
-        //     steps {
-        //         timeout(time: 15, unit: 'MINUTES') {
-        //             input(
-        //                 message: "Deploy ${env.IMAGE}:${env.TAG} to AWS EC2 ${env.AWS_HOST}?",
-        //                 ok: 'Approve Deployment'
-        //             )
-        //         }
-        //     }
-        // }
-
-        stage('07 - Verify AWS Connection') {
-            agent { label 'deploy' }
-
-            steps {
-                sshagent(credentials: ['aws-production-ssh']) {
-                    sh '''
-                        set -eu
-
-                        ssh \
-                        -o BatchMode=yes \
-                        -o StrictHostKeyChecking=yes \
-                        -o ConnectTimeout=10 \
-                        "$AWS_USER@$AWS_HOST" \
-                        'hostname; uname -m; docker info >/dev/null && echo "AWS DOCKER READY"'
-                    '''
+                timeout(time: 15, unit: 'MINUTES') {
+                    input message: 'Deploy to AWS Production?',
+                          ok: 'Approve'
                 }
-            }
-        }
 
-        stage('08 - Deploy AWS Production') {
-            agent { label 'deploy' }
-
-            steps {
                 sshagent(credentials: ['aws-production-ssh']) {
                     sh '''
-                        set -eu
+                        set -e
 
-                        ssh \
-                          -o BatchMode=yes \
-                          -o StrictHostKeyChecking=yes \
-                          "$AWS_USER@$AWS_HOST" \
-                          "IMAGE='$IMAGE:$TAG' bash -se" <<'REMOTE'
-                        set -eu
-
-                        echo "AWS architecture: $(uname -m)"
-
-                        docker info >/dev/null
+                        ssh -o BatchMode=yes \
+                            -o StrictHostKeyChecking=yes \
+                            "$AWS_USER@$AWS_HOST" \
+                            "IMAGE='$IMAGE:$TAG' bash -se" <<'REMOTE'
+                        set -e
 
                         docker pull "$IMAGE"
-
-                        docker rm -f react-prod-demo \
-                          2>/dev/null || true
+                        docker rm -f react-prod-demo || true
 
                         docker run -d \
                           --name react-prod-demo \
-                          --restart unless-stopped \
                           -p 127.0.0.1:3007:80 \
                           "$IMAGE"
 
-                        echo "AWS DEPLOYMENT SUCCESS"
-REMOTE
-                    '''
-                }
-            }
-        }
-
-        stage('09 - Production Health Check') {
-            agent { label 'deploy' }
-
-            steps {
-                sshagent(credentials: ['aws-production-ssh']) {
-                    sh '''
-                        set -eu
-
-                        ssh \
-                          -o BatchMode=yes \
-                          -o StrictHostKeyChecking=yes \
-                          "$AWS_USER@$AWS_HOST" \
-                          'bash -se' <<'REMOTE'
-                        set -eu
-
-                        for i in $(seq 1 15); do
-
-                            if curl -fsS \
-                              http://127.0.0.1:3007/ \
-                              -o /dev/null; then
-
-                                echo "PRODUCTION HEALTHY"
-                                exit 0
-                            fi
-
-                            sleep 2
-                        done
-
-                        echo "PRODUCTION HEALTH CHECK FAILED"
-                        exit 1
+                        curl --retry 10 --retry-delay 2 \
+                          --retry-connrefused -fsS \
+                          http://127.0.0.1:3007/ \
+                          -o /dev/null
 REMOTE
                     '''
                 }
@@ -301,15 +182,11 @@ REMOTE
 
     post {
         success {
-            echo 'FULL CI/CD PIPELINE SUCCESS'
+            echo 'CI/CD PIPELINE SUCCESS'
         }
 
         failure {
-            echo 'PIPELINE FAILED - CHECK CONSOLE OUTPUT'
-        }
-
-        aborted {
-            echo 'PIPELINE ABORTED'
+            echo 'PIPELINE FAILED'
         }
     }
 }
