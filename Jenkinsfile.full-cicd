@@ -2,6 +2,14 @@
 pipeline {
     agent none
 
+    parameters {
+        booleanParam(
+            name: 'DEPLOY_PRODUCTION',
+            defaultValue: false,
+            description: 'Deploy to AWS Production after manual approval'
+        )
+    }
+
     environment {
         IMAGE = 'stefenly19/react-multi-agent'
         TAG = "${BUILD_NUMBER}"
@@ -37,47 +45,45 @@ pipeline {
             }
         }
 
+        stage('3. Trivy Security Scan') {
+            agent { label 'build' }
 
-    stage('3. Trivy Security Scan') {
-        agent { label 'build' }
+            steps {
+                checkout scm
 
-        steps {
-            checkout scm
+                sh '''
+                    set -eu
 
-            sh '''
-                set -eu
+                    mkdir -p trivy-reports .trivy-cache
 
-                mkdir -p trivy-reports .trivy-cache
+                    docker run --rm \
+                      --user "$(id -u):$(id -g)" \
+                      -e HOME=/app \
+                      -v "$PWD:/app" \
+                      -w /app \
+                      aquasec/trivy:0.76.2 \
+                      fs \
+                      --cache-dir /app/.trivy-cache \
+                      --scanners vuln,secret \
+                      --severity HIGH,CRITICAL \
+                      --skip-dirs node_modules \
+                      --skip-dirs .trivy-cache \
+                      --exit-code 1 \
+                      --format json \
+                      --output trivy-reports/report.json \
+                      .
+                '''
+            }
 
-                docker run --rm \
-                --user "$(id -u):$(id -g)" \
-                -e HOME=/app \
-                -v "$PWD:/app" \
-                -w /app \
-                aquasec/trivy:0.76.2 \
-                fs \
-                --cache-dir /app/.trivy-cache \
-                --scanners vuln,secret \
-                --severity HIGH,CRITICAL \
-                --skip-dirs node_modules \
-                --skip-dirs .trivy-cache \
-                --exit-code 1 \
-                --format json \
-                --output trivy-reports/report.json \
-                .
-            '''
-        }
-
-        post {
-            always {
-                archiveArtifacts(
-                    artifacts: 'trivy-reports/report.json',
-                    allowEmptyArchive: true
-                )
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts: 'trivy-reports/report.json',
+                        allowEmptyArchive: true
+                    )
+                }
             }
         }
-    }
-
 
         stage('4. Build React') {
             agent { label 'build' }
@@ -86,7 +92,7 @@ pipeline {
                 checkout scm
 
                 sh '''
-                    set -e
+                    set -eu
                     npm ci
                     npm run build
                 '''
@@ -102,26 +108,47 @@ pipeline {
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub-multi-agent',
-                        usernameVariable: 'USER',
-                        passwordVariable: 'PASS'
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
                     sh '''
-                        set -e
+                        set -eu
                         set +x
 
-                        export DOCKER_CONFIG="$(mktemp -d)"
-                        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+                        # Preserve existing Buildx configuration.
+                        # Only redirect Docker login credentials to a
+                        # temporary configuration directory.
+                        ORIGINAL_DOCKER_CONFIG="${DOCKER_CONFIG:-$HOME/.docker}"
+                        TEMP_DOCKER_CONFIG="$(mktemp -d)"
 
-                        echo "$PASS" | docker login \
-                          -u "$USER" --password-stdin
+                        trap 'rm -rf "$TEMP_DOCKER_CONFIG"' EXIT
 
-                        docker buildx build \
-                          --builder multi-agent-builder \
-                          --platform linux/amd64,linux/arm64 \
-                          -f Dockerfile.multi-agent \
-                          -t "$IMAGE:$TAG" \
-                          --push .
+                        printf '%s' "$DOCKER_PASS" | \
+                          DOCKER_CONFIG="$TEMP_DOCKER_CONFIG" \
+                          docker login \
+                            -u "$DOCKER_USER" \
+                            --password-stdin
+
+                        # Verify the existing Jenkins Buildx builder.
+                        DOCKER_CONFIG="$ORIGINAL_DOCKER_CONFIG" \
+                          docker buildx inspect \
+                            multi-agent-builder --bootstrap
+
+                        # Build and push using the temporary login config.
+                        # Copy Buildx metadata so the builder remains visible.
+                        if [ -d "$ORIGINAL_DOCKER_CONFIG/buildx" ]; then
+                            cp -R "$ORIGINAL_DOCKER_CONFIG/buildx" \
+                              "$TEMP_DOCKER_CONFIG/buildx"
+                        fi
+
+                        DOCKER_CONFIG="$TEMP_DOCKER_CONFIG" \
+                          docker buildx build \
+                            --builder multi-agent-builder \
+                            --platform linux/amd64,linux/arm64 \
+                            -f Dockerfile.multi-agent \
+                            -t "$IMAGE:$TAG" \
+                            --push .
                     '''
                 }
             }
@@ -132,9 +159,10 @@ pipeline {
 
             steps {
                 sh '''
-                    set -e
+                    set -eu
 
                     docker pull "$IMAGE:$TAG"
+
                     docker rm -f react-multi-agent-staging || true
 
                     docker run -d \
@@ -151,6 +179,10 @@ pipeline {
         }
 
         stage('7. Production Approval & Deploy') {
+            when {
+                expression { params.DEPLOY_PRODUCTION }
+            }
+
             agent { label 'deploy' }
 
             steps {
@@ -161,15 +193,16 @@ pipeline {
 
                 sshagent(credentials: ['aws-production-ssh']) {
                     sh '''
-                        set -e
+                        set -eu
 
                         ssh -o BatchMode=yes \
                             -o StrictHostKeyChecking=yes \
                             "$AWS_USER@$AWS_HOST" \
                             "IMAGE='$IMAGE:$TAG' bash -se" <<'REMOTE'
-                        set -e
+                        set -eu
 
                         docker pull "$IMAGE"
+
                         docker rm -f react-prod-demo || true
 
                         docker run -d \
@@ -195,6 +228,10 @@ REMOTE
 
         failure {
             echo 'PIPELINE FAILED'
+        }
+
+        aborted {
+            echo 'PIPELINE ABORTED'
         }
     }
 }
