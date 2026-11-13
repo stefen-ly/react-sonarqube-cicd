@@ -45,10 +45,17 @@ pipeline {
         }
 
 
+ 
         stage('3. OWASP Dependency Check') {
             agent { label 'build' }
 
             steps {
+                // Create report directory before invoking Dependency-Check
+                sh '''
+                    set -eu
+                    mkdir -p dependency-check-report
+                '''
+
                 dependencyCheck(
                     odcInstallation: 'OWASP-Dependency-Check',
                     additionalArguments: '''
