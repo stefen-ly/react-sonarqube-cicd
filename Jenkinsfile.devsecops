@@ -2,11 +2,16 @@
 pipeline {
     agent none
 
+    options {
+        skipDefaultCheckout(true)
+        timestamps()
+    }
+
     parameters {
         booleanParam(
             name: 'DEPLOY_PRODUCTION',
             defaultValue: false,
-            description: 'Deploy to AWS Production after manual approval'
+            description: 'Enable AWS deployment after manual approval'
         )
     }
 
@@ -19,12 +24,59 @@ pipeline {
 
     stages {
 
-        stage('1. SonarQube') {
+        stage('1. Git Checkout') {
             agent { label 'build' }
-
             steps {
                 checkout scm
+                sh 'git log -1 --oneline'
+            }
+        }
 
+        stage('2. Resolve Dependencies') {
+            agent { label 'build' }
+            steps {
+                sh '''
+                    set -eu
+                    node --version
+                    npm --version
+                    npm ci
+                '''
+            }
+        }
+
+        stage('3. OWASP Dependency Check') {
+            agent { label 'build' }
+            steps {
+                dependencyCheck(
+                    odcInstallation: 'OWASP-Dependency-Check',
+                    additionalArguments: '''
+                        --project React-Multi-Agent
+                        --scan .
+                        --format XML
+                        --format HTML
+                        --out dependency-check-report
+                        --exclude "**/node_modules/**"
+                    ''',
+                    stopBuild: true
+                )
+            }
+            post {
+                always {
+                    dependencyCheckPublisher(
+                        pattern: 'dependency-check-report/dependency-check-report.xml',
+                        skipNoReportFiles: true
+                    )
+                    archiveArtifacts(
+                        artifacts: 'dependency-check-report/*',
+                        allowEmptyArchive: true
+                    )
+                }
+            }
+        }
+
+        stage('4. SonarQube Scan') {
+            agent { label 'build' }
+            steps {
                 withSonarQubeEnv('SonarQube-Agent-Lab') {
                     sh '''
                         sonar-scanner \
@@ -37,7 +89,7 @@ pipeline {
             }
         }
 
-        stage('2. Quality Gate') {
+        stage('5. Wait for Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -45,12 +97,25 @@ pipeline {
             }
         }
 
-        stage('3. Trivy Security Scan') {
+        stage('6. Build Image') {
             agent { label 'build' }
-
             steps {
-                checkout scm
+                sh '''
+                    set -eu
 
+                    npm run build
+
+                    docker build \
+                      -f Dockerfile.multi-agent \
+                      -t "$IMAGE:$TAG" \
+                      .
+                '''
+            }
+        }
+
+        stage('7. Trivy Filesystem Scan') {
+            agent { label 'build' }
+            steps {
                 sh '''
                     set -eu
 
@@ -68,43 +133,71 @@ pipeline {
                       --severity HIGH,CRITICAL \
                       --skip-dirs node_modules \
                       --skip-dirs .trivy-cache \
-                      --exit-code 1 \
+                      --skip-dirs dependency-check-report \
+                      --exit-code 0 \
                       --format json \
                       --output trivy-reports/report.json \
                       .
                 '''
             }
+        }
 
-            post {
-                always {
-                    archiveArtifacts(
-                        artifacts: 'trivy-reports/report.json',
-                        allowEmptyArchive: true
-                    )
-                }
+        stage('8. Publish Trivy Filesystem Report') {
+            agent { label 'build' }
+            steps {
+                sh 'test -s trivy-reports/report.json'
+
+                archiveArtifacts(
+                    artifacts: 'trivy-reports/report.json',
+                    fingerprint: true
+                )
+
+                echo 'Trivy report archived successfully'
             }
         }
 
-        stage('4. Build React') {
+        stage('9. Trivy Security Gate') {
             agent { label 'build' }
-
             steps {
-                checkout scm
-
                 sh '''
                     set -eu
-                    npm ci
-                    npm run build
+
+                    python3 - <<'PY'
+import json
+import sys
+from collections import Counter
+
+with open("trivy-reports/report.json") as f:
+    report = json.load(f)
+
+counts = Counter()
+
+for result in report.get("Results", []):
+    for vulnerability in result.get("Vulnerabilities") or []:
+        counts[vulnerability.get("Severity", "UNKNOWN")] += 1
+
+    for secret in result.get("Secrets") or []:
+        counts["SECRETS"] += 1
+
+print("=== TRIVY SECURITY GATE ===", flush=True)
+print("CRITICAL:", counts["CRITICAL"], flush=True)
+print("HIGH:", counts["HIGH"], flush=True)
+print("SECRETS:", counts["SECRETS"], flush=True)
+
+if any(counts[key] > 0 for key in
+       ("CRITICAL", "HIGH", "SECRETS")):
+    print("SECURITY GATE FAILED", flush=True)
+    sys.exit(1)
+
+print("SECURITY GATE PASSED", flush=True)
+PY
                 '''
             }
         }
 
-        stage('5. Docker Build & Push') {
+        stage('10. Push Docker Image') {
             agent { label 'build' }
-
             steps {
-                checkout scm
-
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub-multi-agent',
@@ -116,12 +209,8 @@ pipeline {
                         set -eu
                         set +x
 
-                        # Preserve existing Buildx configuration.
-                        # Only redirect Docker login credentials to a
-                        # temporary configuration directory.
                         ORIGINAL_DOCKER_CONFIG="${DOCKER_CONFIG:-$HOME/.docker}"
                         TEMP_DOCKER_CONFIG="$(mktemp -d)"
-
                         trap 'rm -rf "$TEMP_DOCKER_CONFIG"' EXIT
 
                         printf '%s' "$DOCKER_PASS" | \
@@ -130,13 +219,10 @@ pipeline {
                             -u "$DOCKER_USER" \
                             --password-stdin
 
-                        # Verify the existing Jenkins Buildx builder.
                         DOCKER_CONFIG="$ORIGINAL_DOCKER_CONFIG" \
                           docker buildx inspect \
-                            multi-agent-builder --bootstrap
+                          multi-agent-builder --bootstrap
 
-                        # Build and push using the temporary login config.
-                        # Copy Buildx metadata so the builder remains visible.
                         if [ -d "$ORIGINAL_DOCKER_CONFIG/buildx" ]; then
                             cp -R "$ORIGINAL_DOCKER_CONFIG/buildx" \
                               "$TEMP_DOCKER_CONFIG/buildx"
@@ -149,47 +235,45 @@ pipeline {
                             -f Dockerfile.multi-agent \
                             -t "$IMAGE:$TAG" \
                             --push .
+
+                        echo "Multi-platform image pushed"
                     '''
                 }
             }
         }
 
-
-        stage('6. Deploy Staging') {
+        stage('11. Deploy Staging') {
             agent { label 'deploy' }
-
             steps {
                 sh '''
                     set -eu
 
-                    echo "Pulling Docker image..."
                     docker pull "$IMAGE:$TAG"
 
-                    echo "Replacing staging container..."
                     docker rm -f react-multi-agent-staging || true
 
                     docker run -d \
-                    --name react-multi-agent-staging \
-                    --restart unless-stopped \
-                    -p 127.0.0.1:3006:80 \
-                    "$IMAGE:$TAG"
-
-                    echo "Checking staging health..."
+                      --name react-multi-agent-staging \
+                      --restart unless-stopped \
+                      -p 127.0.0.1:3006:80 \
+                      "$IMAGE:$TAG"
 
                     if ! curl \
-                    --retry 15 \
-                    --retry-delay 2 \
-                    --retry-all-errors \
-                    --connect-timeout 5 \
-                    --max-time 10 \
-                    -fsS \
-                    http://127.0.0.1:3006/ \
-                    -o /dev/null; then
+                      --retry 15 \
+                      --retry-delay 2 \
+                      --retry-all-errors \
+                      --connect-timeout 5 \
+                      --max-time 10 \
+                      -fsS \
+                      http://127.0.0.1:3006/ \
+                      -o /dev/null; then
 
-                        echo "Staging health check failed"
                         docker ps -a \
-                        --filter name=react-multi-agent-staging
-                        docker logs --tail 100 react-multi-agent-staging
+                          --filter name=react-multi-agent-staging
+
+                        docker logs --tail 100 \
+                          react-multi-agent-staging
+
                         exit 1
                     fi
 
@@ -198,8 +282,7 @@ pipeline {
             }
         }
 
-
-        stage('7. Production Approval & Deploy') {
+        stage('12. Production Approval & Deploy') {
             when {
                 expression { params.DEPLOY_PRODUCTION }
             }
@@ -220,21 +303,26 @@ pipeline {
                             -o StrictHostKeyChecking=yes \
                             "$AWS_USER@$AWS_HOST" \
                             "IMAGE='$IMAGE:$TAG' bash -se" <<'REMOTE'
-                        set -eu
+set -eu
 
-                        docker pull "$IMAGE"
+docker pull "$IMAGE"
 
-                        docker rm -f react-prod-demo || true
+docker rm -f react-prod-demo || true
 
-                        docker run -d \
-                          --name react-prod-demo \
-                          -p 127.0.0.1:3007:80 \
-                          "$IMAGE"
+docker run -d \
+  --name react-prod-demo \
+  --restart unless-stopped \
+  -p 127.0.0.1:3007:80 \
+  "$IMAGE"
 
-                        curl --retry 10 --retry-delay 2 \
-                          --retry-connrefused -fsS \
-                          http://127.0.0.1:3007/ \
-                          -o /dev/null
+curl \
+  --retry 15 \
+  --retry-delay 2 \
+  --retry-all-errors \
+  -fsS \
+  http://127.0.0.1:3007/ \
+  -o /dev/null
+
 REMOTE
                     '''
                 }
@@ -248,11 +336,11 @@ REMOTE
         }
 
         failure {
-            echo 'PIPELINE FAILED'
+            echo 'CI/CD PIPELINE FAILED'
         }
 
         aborted {
-            echo 'PIPELINE ABORTED'
+            echo 'CI/CD PIPELINE ABORTED'
         }
     }
 }
