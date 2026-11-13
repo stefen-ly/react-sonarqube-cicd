@@ -56,18 +56,19 @@ pipeline {
                     mkdir -p dependency-check-report
                 '''
 
-                dependencyCheck(
-                    odcInstallation: 'OWASP-Dependency-Check',
-                    additionalArguments: '''
-                        --project React-Multi-Agent
-                        --scan .
-                        --format XML
-                        --format HTML
-                        --out dependency-check-report
-                        --exclude "**/node_modules/**"
-                    ''',
-                    stopBuild: true
-                )
+                    dependencyCheck(
+                        odcInstallation: 'OWASP-Dependency-Check',
+                        nvdCredentialsId: 'nvd-api-key',
+                        additionalArguments: '''
+                            --project React-Multi-Agent
+                            --scan .
+                            --format XML
+                            --format HTML
+                            --out dependency-check-report
+                            --exclude "**/node_modules/**"
+                        ''',
+                        stopBuild: true
+                    )
             }
 
             post {
